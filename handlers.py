@@ -10,19 +10,20 @@ from aiogram import flags
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command, StateFilter
 
+import logging
 import utils
 from states import CodeState
 
 router = Router()
 
-encrypted_message_storage=[]
+# encrypted_message_storage=[]
 
 key_word = "SKVAZIMABZBZ"
 
 buttons = [
     [InlineKeyboardButton(text="encrypt", callback_data=f"encrypt_callback"),
-    InlineKeyboardButton(text="decrypt", callback_data=f"decrypt_text_callback"),
-    InlineKeyboardButton(text="decrypt encrypted message", callback_data=f"decode_selected_callback")],
+    InlineKeyboardButton(text="decrypt", callback_data=f"decrypt_text_callback")],
+    # InlineKeyboardButton(text="decrypt encrypted message", callback_data=f"decode_selected_callback")],
     [InlineKeyboardButton(text="chose key word", callback_data=f"set_key")]
 ]
 
@@ -62,31 +63,30 @@ async def set_key(callback: types.CallbackQuery, state : FSMContext):
 @flags.chat_action("typing")
 async def encode_state(msg: Message, state: FSMContext):
     query = msg.text
+    logging.info(f"Word for encrypt: {query}")
     mesg = await msg.answer("Ждите ответа на запрос")
-    res, shifre = utils.EncodeText(query, key_word)
-    logging.info(f"CODED MESSAGE: {res}, SHIFRE: {shifre}")
-    shifreVal[res] = shifre
+    res = utils.vigenere_encrypt(query, key_word)
+    logging.info(f"Word: {query}, has been encrypted to: {res}")
     if len(res) == 0:
         return await mesg.edit_text("Ошибка при зашифровывания сообщения")
-    encrypted_message_storage.append(res)
     await mesg.edit_text(res, reply_markup=buttons)
    
 
 
-@router.callback_query(F.data == "decode_selected_callback")
-async def decrypt_text_callback(callback: types.CallbackQuery, state : FSMContext):
-    if len(encrypted_message_storage) > 0:
-        await state.set_state(CodeState.decrypt_selected_state)
-        message = ""
-        for i in range(len(encrypted_message_storage)):
-            word = encrypted_message_storage[i]
-            if i == 0:
-                message += ": " + word + " : "
-            else:
-                message += word + " : "
-        await callback.message.edit_text("Выберете слово которое вы хотите расшифровать из списка:\n" + message)
-    else:
-        await callback.message.edit_text("Список зашифрованных сообщений пуст.\nДля начала зашифруйте сообщение", reply_markup=buttons)
+# @router.callback_query(F.data == "decode_selected_callback")
+# async def decrypt_text_callback(callback: types.CallbackQuery, state : FSMContext):
+#     if len(encrypted_message_storage) > 0:
+#         await state.set_state(CodeState.decrypt_selected_state)
+#         message = ""
+#         for i in range(len(encrypted_message_storage)):
+#             word = encrypted_message_storage[i]
+#             if i == 0:
+#                 message += ": " + word + " : "
+#             else:
+#                 message += word + " : "
+#         await callback.message.edit_text("Выберете слово которое вы хотите расшифровать из списка:\n" + message)
+#     else:
+#         await callback.message.edit_text("Список зашифрованных сообщений пуст.\nДля начала зашифруйте сообщение", reply_markup=buttons)
 
 
             
@@ -106,26 +106,27 @@ async def new_key_set(msg: Message, state: FSMContext):
 
 @router.message(CodeState.decode_text_state)
 @flags.chat_action("typing")
-async def encode_text(msg: Message, state: FSMContext):
+async def decrypt_text(msg: Message, state: FSMContext):
     query = msg.text
+    logging.info(f"Message query: {query}")
     mesg = await msg.answer("Ждите ответа на запрос")
-    res = utils.DecodeText(shifreVal[query], key_word)
-    print("res=",res)
+    res = utils.vigenere_decrypt(query, key_word)
+    logging.info(f"Decrypted message: {res}")
     if len(res) == 0:
         return await mesg.edit_text("Ошибка при расшифровки сообщения")
     await mesg.edit_text(res, reply_markup=buttons)
 
 
-@router.message(CodeState.decrypt_selected_state)
-@flags.chat_action("typing")
-async def decode_selected_message(msg: Message, state: FSMContext):
-    query = msg.text
-    mesg = await msg.answer("Ждите ответа на запрос")
-    if query in encrypted_message_storage:
-        res = utils.DecodeText(query)
-        if len(res) == 0:
-            return await mesg.edit_text("Ошибка при расшифровки сообщения")
-        encrypted_message_storage.remove(query)
-        await mesg.edit_text(res, reply_markup=buttons)
-    else:
-        await mesg.edit_text("Данного слова нет в списке", reply_markup=buttons)
+# @router.message(CodeState.decrypt_selected_state)
+# @flags.chat_action("typing")
+# async def decode_selected_message(msg: Message, state: FSMContext):
+#     query = msg.text
+#     mesg = await msg.answer("Ждите ответа на запрос")
+#     if query in encrypted_message_storage:
+#         res = utils.vigenere_decrypt(query)
+#         if len(res) == 0:
+#             return await mesg.edit_text("Ошибка при расшифровки сообщения")
+#         encrypted_message_storage.remove(query)
+#         await mesg.edit_text(res, reply_markup=buttons)
+#     else:
+#         await mesg.edit_text("Данного слова нет в списке", reply_markup=buttons)
